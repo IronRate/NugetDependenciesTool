@@ -4,6 +4,7 @@
 
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
+using NuGet.Versioning;
 using NugetDependenciesTool;
 using NugetDependenciesTool.Models;
 
@@ -17,55 +18,19 @@ var logger = new LoggerStub();
 SourceCacheContext cache = new SourceCacheContext();
 var factory = new Repository.RepositoryFactory();
 var repository = factory.GetCoreV3(argums.nuget);
-FindPackageByIdResource resource = await repository.GetResourceAsync<FindPackageByIdResource>();
+var resource = await repository.GetResourceAsync<FindPackageByIdResource>();
+var resource2 = await repository.GetResourceAsync<PackageMetadataResource>();
 
 var fullDependenciesList = new List<PackageInfo>();
-
-
 
 var inputReader = new InputReader(argums.input);
 var rootPackagesList = (await inputReader.ReadAsync()) ?? Array.Empty<string>();
 
 
-//string[] rootPackagesList = {
-//"Microsoft.EntityFrameworkCore.Relational",
-//"Microsoft.EntityFrameworkCore.Sqlite",
-//"Microsoft.EntityFrameworkCore.Abstractions",
-//"Microsoft.EntityFrameworkCore.Analyzers",
-//"Microsoft.EntityFrameworkCore.Design",
-//"Microsoft.EntityFrameworkCore.InMemory",
-//"Microsoft.EntityFrameworkCore.Sqlite.Core",
-//"Microsoft.EntityFrameworkCore.SqlServer",
-//"Microsoft.EntityFrameworkCore.Tools",
-//"Microsoft.Extensions.Configuration.Binder",
-//"Microsoft.Extensions.Configuration.Json",
-//"Microsoft.Extensions.Features",
-//"Microsoft.Extensions.Hosting.WindowsServices",
-//"Microsoft.Extensions.Logging.Abstraction",
-//"Microsoft.NET.Test.Sdk",
-//"Microsoft.Extensions.Features",
-//"Microsoft.AspNetCore.Connections.Abstractions",
-//"System.Security.Cryptography.Pkcs",
-//// Other
-//"Confluent.Kafka",
-//"FluentValidation",
-//"FluentValidation.DependencyInjectionExtensions",
-//"MSTest.TestAdapter",
-//"MSTest.TestFramework",
-//"MediatR",
-//"NLog",
-//"NLog.Extensions.Logging",
-//"NLog.Web.AspNetCore",
-//"System.Text.Json",
-//"CsvHelper",
-//"xUnit",
-//"NSubstitute",
-//"Quartz.AspNetCore"
-//};
 
 foreach (var rootPackage in rootPackagesList)
 {
-    var packages = await GetAllDependencies(rootPackage);
+    var packages = await GetRootDependenciesAsync(rootPackage, CancellationToken.None);
     if (packages != null && packages.Any())
         fullDependenciesList.AddRange(packages);
 }
@@ -82,27 +47,45 @@ await writer.WriteAsync(fullDependenciesList);
 
 Console.WriteLine("Work is complete!");
 
-async Task<IEnumerable<PackageInfo>?> GetAllDependencies(string packageId)
+async Task<IEnumerable<PackageInfo>?> GetRootDependenciesAsync(string packageId, CancellationToken cancellation)
 {
+    // Берем только те версии, которые месяц как опубликованы.
+    var now = DateTimeOffset.Now;
+    var month = now.AddDays(-31);
+
     var result = new List<PackageInfo>(1);
-    var versions = await resource.GetAllVersionsAsync(packageId, cache, logger, CancellationToken.None);
-    if (versions.Any())
+    var metadata = await resource2.GetMetadataAsync(packageId, false, false, cache, logger, cancellation);
+    var enumerable = metadata
+         .Cast<PackageSearchMetadataRegistration>()
+         .Where(x => x.Published < month)
+         .OrderByDescending(x => x.Version);
+    if (enumerable.Any())
     {
-        var lastVersion = versions.Last(x => !x.IsPrerelease);
+        var lastVersion = enumerable
+            .First(x => !x.Version.IsPrerelease);
+
         result.Add(new PackageInfo(packageId, lastVersion.Version.ToString(), true));
-        var packages = await GetPackageDependencies(packageId, lastVersion.Version);
+        
+        var packages = await GetPackageDependenciesAsync(
+            packageId,
+            lastVersion.Version,
+            cancellation
+        );
         if (packages != null && packages.Any())
             result.AddRange(packages);
     }
+
     return result;
 }
-
-async Task<IEnumerable<PackageInfo>?> GetPackageDependencies(string packageId, Version version)
+async Task<IEnumerable<PackageInfo>?> GetPackageDependenciesAsync(
+    string packageId,
+    NuGetVersion version,
+    CancellationToken cancellation
+)
 {
     var listOfPackages = default(List<PackageInfo>);
 
-    var lastVersion = new NuGet.Versioning.NuGetVersion(version);
-    var dependencies = await resource.GetDependencyInfoAsync(packageId, lastVersion, cache, logger, CancellationToken.None);
+    var dependencies = await resource.GetDependencyInfoAsync(packageId, version, cache, logger, cancellation);
     var packages = dependencies.DependencyGroups.Select(x => x.Packages).FirstOrDefault();
     if (packages != null)
     {
@@ -110,7 +93,13 @@ async Task<IEnumerable<PackageInfo>?> GetPackageDependencies(string packageId, V
         listOfPackages.AddRange(packages.Select(x => new PackageInfo(x, false)));
         foreach (var package in packages)
         {
-            var dep1 = await GetPackageDependencies(package.Id, package.VersionRange.MinVersion?.Version ?? package.VersionRange.MaxVersion?.Version);
+            cancellation.ThrowIfCancellationRequested();
+
+            var dep1 = await GetPackageDependenciesAsync(
+                package.Id,
+                package.VersionRange.MinVersion ?? package.VersionRange.MaxVersion,
+                cancellation
+            );
             if (dep1 != null)
                 listOfPackages.AddRange(dep1);
         }

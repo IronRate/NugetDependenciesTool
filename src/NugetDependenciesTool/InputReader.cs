@@ -29,7 +29,7 @@ internal sealed class InputReader
             var line = await file.ReadLineAsync(cancellation);
             if (line != null && !_regex.IsMatch(line))
             {
-                result.Add(line);
+                result.Add(line.TrimEnd());
             }
 
         } while (!file.EndOfStream);

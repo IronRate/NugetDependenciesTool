@@ -7,8 +7,8 @@ internal class PackageInfo
     public PackageInfo(PackageDependency dependency, bool root)
     {
         Id = dependency.Id;
-        Version = dependency.VersionRange.MinVersion?.Version.ToString()
-            ?? dependency.VersionRange.MaxVersion?.Version.ToString();
+        Version = dependency.VersionRange.MinVersion?.ToString()
+            ?? dependency.VersionRange.MaxVersion?.ToString();
         Root = root;
     }
 

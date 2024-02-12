@@ -14,6 +14,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "root", "root", "{E5759EF9-0
 		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{EFB46679-6F26-458B-8BAD-744F8C8F0102}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NugetDependenciesToolTests", "..\tests\NugetDependenciesToolTests\NugetDependenciesToolTests.csproj", "{E3ED496E-EFFD-4449-B8AD-33DF10D5C68B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,12 +28,17 @@ Global
 		{4E86742C-01E4-4E34-93E9-95FA89B09E7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E86742C-01E4-4E34-93E9-95FA89B09E7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E86742C-01E4-4E34-93E9-95FA89B09E7B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E3ED496E-EFFD-4449-B8AD-33DF10D5C68B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E3ED496E-EFFD-4449-B8AD-33DF10D5C68B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E3ED496E-EFFD-4449-B8AD-33DF10D5C68B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E3ED496E-EFFD-4449-B8AD-33DF10D5C68B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{4E86742C-01E4-4E34-93E9-95FA89B09E7B} = {24E54568-5784-46A8-86DA-A277B4F3D1C4}
+		{E3ED496E-EFFD-4449-B8AD-33DF10D5C68B} = {EFB46679-6F26-458B-8BAD-744F8C8F0102}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {27457092-CDF7-40F7-AAFA-6392ADDBC13B}
