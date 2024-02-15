@@ -2,7 +2,7 @@
   "profiles": {
     "NugetDependenciesTool": {
       "commandName": "Project",
-      "commandLineArgs": "--input input.txt --output packages2.csv"
+      "commandLineArgs": "--input input2.txt --output packages2.csv"
     }
   }
 }

@@ -24,7 +24,7 @@ var resource2 = await repository.GetResourceAsync<PackageMetadataResource>();
 var fullDependenciesList = new List<PackageInfo>();
 
 var inputReader = new InputReader(argums.input);
-var rootPackagesList = (await inputReader.ReadAsync()) ?? Array.Empty<string>();
+var rootPackagesList = (await inputReader.ReadAsync()) ?? Array.Empty<(string, Version?)>();
 
 
 
@@ -47,27 +47,37 @@ await writer.WriteAsync(fullDependenciesList);
 
 Console.WriteLine("Work is complete!");
 
-async Task<IEnumerable<PackageInfo>?> GetRootDependenciesAsync(string packageId, CancellationToken cancellation)
+async Task<IEnumerable<PackageInfo>?> GetRootDependenciesAsync((string packageId, Version? version) package, CancellationToken cancellation)
 {
     // Берем только те версии, которые месяц как опубликованы.
     var now = DateTimeOffset.Now;
     var month = now.AddDays(-31);
 
     var result = new List<PackageInfo>(1);
-    var metadata = await resource2.GetMetadataAsync(packageId, false, false, cache, logger, cancellation);
-    var enumerable = metadata
-         .Cast<PackageSearchMetadataRegistration>()
-         .Where(x => x.Published < month)
-         .OrderByDescending(x => x.Version);
+    var metadata = await resource2.GetMetadataAsync(package.packageId, false, false, cache, logger, cancellation);
+
+    var enumerable = package.version == null
+        ? metadata
+            .Cast<PackageSearchMetadataRegistration>()
+            .Where(x => x.Published < month)
+            .OrderByDescending(x => x.Version)
+         : metadata
+            .Cast<PackageSearchMetadataRegistration>()
+            .Where(x => x.Version.Major == package.version.Major)
+            .Where(x => x.Version.Minor == package.version.Minor)
+            .Where(x => x.Version.Patch == package.version.Build)
+            .OrderByDescending(x => x.Version);
+
+
     if (enumerable.Any())
     {
         var lastVersion = enumerable
             .First(x => !x.Version.IsPrerelease);
 
-        result.Add(new PackageInfo(packageId, lastVersion.Version.ToString(), true));
-        
+        result.Add(new PackageInfo(package.packageId, lastVersion.Version.ToString(), true));
+
         var packages = await GetPackageDependenciesAsync(
-            packageId,
+            package.packageId,
             lastVersion.Version,
             cancellation
         );
