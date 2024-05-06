@@ -2,6 +2,7 @@
 // https://russianblogs.com/article/63162304640/
 // https://learn.microsoft.com/ru-ru/nuget/api/registration-base-url-resource
 
+using System.Collections.Concurrent;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
@@ -25,7 +26,8 @@ var fullDependenciesList = new List<PackageInfo>();
 
 var inputReader = new InputReader(argums.input);
 var rootPackagesList = (await inputReader.ReadAsync()) ?? Array.Empty<(string, Version?)>();
-
+var nodesVisited = new ConcurrentDictionary<(string, string), bool>();//<-посещенные узлы.
+string[] frameworks = [/*".NETFramework", */".NETCoreApp", ".NETStandard"];
 
 
 foreach (var rootPackage in rootPackagesList)
@@ -94,26 +96,31 @@ async Task<IEnumerable<PackageInfo>?> GetPackageDependenciesAsync(
 )
 {
     var listOfPackages = default(List<PackageInfo>);
+    var key = (packageId, version?.Version.ToString());
+
+    if (nodesVisited.ContainsKey(key))
+        return listOfPackages;
 
     var dependencies = await resource.GetDependencyInfoAsync(packageId, version, cache, logger, cancellation);
-    var packages = dependencies.DependencyGroups.Select(x => x.Packages).FirstOrDefault();
-    if (packages != null)
-    {
-        listOfPackages = new List<PackageInfo>(packages.Count());
-        listOfPackages.AddRange(packages.Select(x => new PackageInfo(x, false)));
-        foreach (var package in packages)
-        {
-            cancellation.ThrowIfCancellationRequested();
+    var packages = dependencies.DependencyGroups
+        .Where(x => frameworks.Contains(x.TargetFramework.Framework))
+        .SelectMany(x => x.Packages).ToList();
 
-            var dep1 = await GetPackageDependenciesAsync(
-                package.Id,
-                package.VersionRange.MinVersion ?? package.VersionRange.MaxVersion,
-                cancellation
-            );
-            if (dep1 != null)
-                listOfPackages.AddRange(dep1);
-        }
+    listOfPackages = new List<PackageInfo>(packages.Count());
+    listOfPackages.AddRange(packages.Select(x => new PackageInfo(x, false)));
+    foreach (var package in packages)
+    {
+        cancellation.ThrowIfCancellationRequested();
+
+        var dep1 = await GetPackageDependenciesAsync(
+            package.Id,
+            package.VersionRange.MinVersion ?? package.VersionRange.MaxVersion,
+            cancellation
+        );
+        if (dep1 != null)
+            listOfPackages.AddRange(dep1);
     }
+    nodesVisited.TryAdd(key, true);
 
     return listOfPackages;
 }
